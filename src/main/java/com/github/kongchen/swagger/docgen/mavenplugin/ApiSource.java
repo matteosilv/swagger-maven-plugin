@@ -8,6 +8,8 @@ import org.apache.maven.plugins.annotations.Parameter;
 import org.reflections.Reflections;
 import org.springframework.core.annotation.AnnotationUtils;
 
+import com.google.common.base.Predicate;
+
 import java.io.File;
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
@@ -123,8 +125,28 @@ public class ApiSource {
     @Parameter
     private List<String> modelConverters;
 
+    private Predicate<Class<?>> classFilter;
+
+    public void setClassFilter(Predicate<Class<?>> classFilter) {
+        this.classFilter = classFilter;
+    }
+
+    private class FilteredHashSet extends HashSet<Class<?>> {
+        private static final long serialVersionUID = 1L;
+
+        @Override
+        public boolean add(Class<?> c) {
+            if (classFilter != null && classFilter.apply(c)) {
+                return true;
+            }
+
+            return super.add(c);
+        }
+
+    }
+
     public Set<Class<?>> getValidClasses(Class<? extends Annotation> clazz) {
-        Set<Class<?>> classes = new HashSet<Class<?>>();
+        Set<Class<?>> classes = new FilteredHashSet();
         if (getLocations() == null) {
             Set<Class<?>> c = new Reflections("").getTypesAnnotatedWith(clazz);
             classes.addAll(c);
@@ -173,14 +195,16 @@ public class ApiSource {
         Info resultInfo = new Info();
         for (Class<?> aClass : getValidClasses(SwaggerDefinition.class)) {
             SwaggerDefinition swaggerDefinition = AnnotationUtils.findAnnotation(aClass, SwaggerDefinition.class);
-            io.swagger.annotations.Info infoAnnotation = swaggerDefinition.info();
-            Info info = new Info().title(infoAnnotation.title())
-                    .description(infoAnnotation.description())
-                    .version(infoAnnotation.version())
-                    .termsOfService(infoAnnotation.termsOfService())
-                    .license(from(infoAnnotation.license()))
-                    .contact(from(infoAnnotation.contact()));
-            resultInfo.mergeWith(info);
+            if (swaggerDefinition != null) {
+                io.swagger.annotations.Info infoAnnotation = swaggerDefinition.info();
+                Info info = new Info().title(infoAnnotation.title())
+                        .description(infoAnnotation.description())
+                        .version(infoAnnotation.version())
+                        .termsOfService(infoAnnotation.termsOfService())
+                        .license(from(infoAnnotation.license()))
+                        .contact(from(infoAnnotation.contact()));
+                resultInfo.mergeWith(info);
+            }
         }
         info = resultInfo;
     }
@@ -201,14 +225,18 @@ public class ApiSource {
     private void setBasePathFromAnnotation() {
         for (Class<?> aClass : getValidClasses(SwaggerDefinition.class)) {
             SwaggerDefinition swaggerDefinition = AnnotationUtils.findAnnotation(aClass, SwaggerDefinition.class);
-            basePath = swaggerDefinition.basePath();
+            if (swaggerDefinition != null) {
+                basePath = swaggerDefinition.basePath();
+            }
         }
     }
 
     private void setHostFromAnnotation() {
         for (Class<?> aClass : getValidClasses(SwaggerDefinition.class)) {
             SwaggerDefinition swaggerDefinition = AnnotationUtils.findAnnotation(aClass, SwaggerDefinition.class);
-            host = swaggerDefinition.host();
+            if (swaggerDefinition != null) {
+                host = swaggerDefinition.host();
+            }
         }
     }
 

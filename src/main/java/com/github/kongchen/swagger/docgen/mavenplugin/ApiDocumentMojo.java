@@ -1,7 +1,7 @@
 package com.github.kongchen.swagger.docgen.mavenplugin;
 
-import com.github.kongchen.swagger.docgen.AbstractDocumentSource;
-import com.github.kongchen.swagger.docgen.GenerateException;
+import java.io.File;
+import java.util.List;
 
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
@@ -14,8 +14,9 @@ import org.apache.maven.plugins.annotations.ResolutionScope;
 import org.apache.maven.project.MavenProject;
 import org.apache.maven.project.MavenProjectHelper;
 
-import java.io.File;
-import java.util.List;
+import com.github.kongchen.swagger.docgen.AbstractDocumentSource;
+import com.github.kongchen.swagger.docgen.GenerateException;
+import com.google.common.base.Predicate;
 
 /**
  * User: kongchen
@@ -73,9 +74,19 @@ public class ApiDocumentMojo extends AbstractMojo {
                     "swagger-maven-plugin 3.0+ only supports swagger spec 2.0");
         }
 
+        Predicate<Class<?>> filter;
+        try {
+            List<?> compileClasspathElements = project.getCompileClasspathElements();
+            filter = new ApiClassFilter(compileClasspathElements);
+        } catch (Exception ex) {
+            getLog().warn("Unable to create classes filter");
+            filter = null;
+        }
+
         try {
             getLog().debug(apiSources.toString());
             for (ApiSource apiSource : apiSources) {
+                apiSource.setClassFilter(filter);
                 validateConfiguration(apiSource);
                 AbstractDocumentSource documentSource = apiSource.isSpringmvc()
                         ? new SpringMavenDocumentSource(apiSource, getLog())
